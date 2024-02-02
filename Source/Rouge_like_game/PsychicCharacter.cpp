@@ -11,16 +11,18 @@
 #include "Engine/World.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 
 // Sets default values
 APsychicCharacter::APsychicCharacter() :
 	TeleState(ETeleState::ETS_Idle),
 	MaxTeleScanDistance(1000.0f),
 	ItemGrabForceAmount(100.0f),
-	ItemReleaseForceAmount(1000.0f)
+	ItemReleaseForceAmount(1000.0f),
+	ItemMinGrabDistance(100.0f)
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	//Set size for Capsule Component
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
@@ -30,6 +32,14 @@ APsychicCharacter::APsychicCharacter() :
 	CameraComponent->SetupAttachment(GetCapsuleComponent());
 	CameraComponent->SetRelativeLocation(FVector(-39.56f, 1.75f, 64.f)); // Position the camera
 	CameraComponent->bUsePawnControlRotation = true;
+
+	// Create a mesh component that will be used when being viewed from a '1st person' view (when controlling this pawn)
+	FPHandsMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FPHandsMesh"));
+	FPHandsMesh->SetOnlyOwnerSee(true);
+	FPHandsMesh->SetupAttachment(CameraComponent);
+	FPHandsMesh->bCastDynamicShadow = false;
+	FPHandsMesh->CastShadow = false;
+	FPHandsMesh->SetRelativeLocation(FVector(-5.f, 0.f, -170.f));
 }
 
 // Called when the game starts or when spawned
@@ -53,7 +63,19 @@ void APsychicCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	DebugLogVal(-1, -1.0, FColor::Cyan, "Current State: ", UEnum::GetValueAsString<ETeleState>(TeleState));
+	/*if (bMouseHolding)
+	{
+		if (TeleState == ETeleState::ETS_Scanning && CurrentItemGrabbed == nullptr)
+			ScanForItems();
+		else if (TeleState == ETeleState::ETS_Holding || TeleState == ETeleState::ETS_CanFire && CurrentItemGrabbed != nullptr)
+			GrabItem();
+	}*/
+
+	//DebugLogVal(-1, -1.0, FColor::Cyan, "Current State: ", UEnum::GetValueAsString<ETeleState>(TeleState));
+	//if (GEngine)
+		//GEngine->AddOnScreenDebugMessage(-1, -1.0, FColor::Red, FString::Printf("Current State: %s", TeleState));
+
+	//UE_LOG(LogTemp, Log, TEXT("Current State: %s"), *UEnum::GetValueAsName(TeleState).ToString());
 }
 
 // Called to bind functionality to input
@@ -70,7 +92,7 @@ void APsychicCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 		PEI->BindAction(InputActions->InputPrimary, ETriggerEvent::Started, this, &APsychicCharacter::PrimaryPressed);
 		PEI->BindAction(InputActions->InputPrimary, ETriggerEvent::Ongoing, this, &APsychicCharacter::PrimaryHold);
-		PEI->BindAction(InputActions->InputPrimary, ETriggerEvent::Canceled, this, &APsychicCharacter::PrimaryRelease);
+		PEI->BindAction(InputActions->InputPrimary, ETriggerEvent::Completed, this, &APsychicCharacter::PrimaryRelease);
 	}
 }
 
@@ -108,10 +130,10 @@ void APsychicCharacter::PrimaryPressed(const FInputActionValue& Value)
 void APsychicCharacter::PrimaryHold(const FInputActionValue& Value)
 {
 	//DebugLog(-1, -1.0f, FColor::Green, "Primary - Hold");
-
+	
 	if (TeleState == ETeleState::ETS_Scanning && CurrentItemGrabbed == nullptr)
 		ScanForItems();
-	else if (TeleState == ETeleState::ETS_Holding && CurrentItemGrabbed != nullptr)
+	else if (TeleState == ETeleState::ETS_Holding || TeleState == ETeleState::ETS_CanFire && CurrentItemGrabbed != nullptr)
 		GrabItem();
 }
 
@@ -121,12 +143,22 @@ void APsychicCharacter::PrimaryRelease(const FInputActionValue& Value)
 
 	if (TeleState == ETeleState::ETS_Scanning)
 		TeleState = ETeleState::ETS_Idle;
-	else if (TeleState == ETeleState::ETS_Holding && CurrentItemGrabbed != nullptr)
+	else if (CurrentItemGrabbed != nullptr)
 	{
-		ReleaseShootItem();
-		//TODO: Do Timer transition from Firing to Idle State
-		TeleState = ETeleState::ETS_Idle;
+		if (CurrentItemGrabbed->GetItemState() == EItemState::EIT_Grabbed && TeleState == ETeleState::ETS_CanFire)
+		{
+			ReleaseShootItem();
+			TeleState = ETeleState::ETS_Idle;
+		}
+		else if (CurrentItemGrabbed->GetItemState() == EItemState::EIT_Grabbing && TeleState == ETeleState::ETS_Holding)
+		{
+			TeleState = ETeleState::ETS_Idle;
+			CurrentItemGrabbed->SetItemState(EItemState::EIT_Idle);
+			CurrentItemGrabbed = nullptr;
+		}
 	}
+	else
+		TeleState = ETeleState::ETS_Idle;
 }
 
 FVector APsychicCharacter::GetGrabLocation()
@@ -136,11 +168,6 @@ FVector APsychicCharacter::GetGrabLocation()
 
 void APsychicCharacter::ScanForItems()
 {
-	//DebugLog(-1, -1.0f, FColor::Green, "Primary - Scanning Items");
-
-	if (TeleState != ETeleState::ETS_Scanning)
-		return;
-
 	const FVector TraceStart = CameraComponent->GetComponentLocation();
 	const FVector TraceEnd = CameraComponent->GetComponentLocation() + CameraComponent->GetForwardVector() * MaxTeleScanDistance;
 
@@ -164,6 +191,16 @@ void APsychicCharacter::GrabItem()
 	GrabDir.Normalize();
 
 	CurrentItemGrabbed->GetItemMesh()->AddForce(GrabDir * ItemGrabForceAmount);
+
+	if (CurrentItemGrabbed->GetItemState() == EItemState::EIT_Grabbing)
+	{
+		float distance = FVector::Distance(GetGrabLocation(), CurrentItemGrabbed->GetActorLocation());
+		if (distance <= ItemMinGrabDistance)
+		{
+			TeleState = ETeleState::ETS_CanFire;
+			CurrentItemGrabbed->SetItemState(EItemState::EIT_Grabbed);
+		}
+	}
 }
 
 void APsychicCharacter::ReleaseShootItem()

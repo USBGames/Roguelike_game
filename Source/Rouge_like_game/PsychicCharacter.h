@@ -8,6 +8,7 @@
 #include "PsychicCharacter.generated.h"
 
 class UCameraComponent;
+class USkeletalMeshComponent;
 class UInputMappingContext;
 class UPsychicInputConfigData;
 class APsychicItem;
@@ -18,7 +19,7 @@ enum class ETeleState : uint8
 	ETS_Idle UMETA(DisplayName = "Idle"),
 	ETS_Scanning UMETA(DisplayName = "Scanning"),
 	ETS_Holding UMETA(DisplayName = "Holding"),
-	ETS_Firing UMETA(DisplayName = "Firing"),
+	ETS_CanFire UMETA(DisplayName = "Can Fire"),
 	ETS_MAX UMETA(DisplayName = "DefaultMAX")
 };
 
@@ -65,6 +66,9 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Psychic - Camera", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* CameraComponent;
 
+	UPROPERTY(VisibleDefaultsOnly, Category = "Psychic - Combat")
+	USkeletalMeshComponent* FPHandsMesh;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
 	ETeleState TeleState;
 
@@ -77,8 +81,11 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
 	float ItemReleaseForceAmount;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
+	float ItemMinGrabDistance;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
-	APsychicItem* CurrentItemGrabbed;
+	APsychicItem* CurrentItemGrabbed;	
 
 public:
 	FORCEINLINE UCameraComponent* GetCameraComponent() const { return CameraComponent; }

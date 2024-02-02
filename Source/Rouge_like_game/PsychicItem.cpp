@@ -40,6 +40,7 @@ void APsychicItem::SetItemProperties()
 		ItemMesh->SetAngularDamping(0.0f);
 		ItemMesh->SetSimulatePhysics(true);
 		ItemMesh->SetEnableGravity(true);
+		ItemMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Block);
 		break;
 	case EItemState::EIT_Grabbing:
 	case EItemState::EIT_Grabbed:
@@ -47,6 +48,7 @@ void APsychicItem::SetItemProperties()
 		ItemMesh->SetAngularDamping(4.0f);
 		ItemMesh->SetSimulatePhysics(true);
 		ItemMesh->SetEnableGravity(false);
+		ItemMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Ignore);
 		break;
 	}
 }
