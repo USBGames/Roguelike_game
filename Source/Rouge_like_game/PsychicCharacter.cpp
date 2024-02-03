@@ -33,10 +33,13 @@ APsychicCharacter::APsychicCharacter() :
 	CameraComponent->SetRelativeLocation(FVector(-39.56f, 1.75f, 64.f)); // Position the camera
 	CameraComponent->bUsePawnControlRotation = true;
 
+	FPHandsRoot = CreateDefaultSubobject<USceneComponent>(TEXT("FPHandsRoot"));
+	FPHandsRoot->SetupAttachment(CameraComponent);
+
 	// Create a mesh component that will be used when being viewed from a '1st person' view (when controlling this pawn)
 	FPHandsMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FPHandsMesh"));
 	FPHandsMesh->SetOnlyOwnerSee(true);
-	FPHandsMesh->SetupAttachment(CameraComponent);
+	FPHandsMesh->SetupAttachment(FPHandsRoot);
 	FPHandsMesh->bCastDynamicShadow = false;
 	FPHandsMesh->CastShadow = false;
 	FPHandsMesh->SetRelativeLocation(FVector(-5.f, 0.f, -170.f));

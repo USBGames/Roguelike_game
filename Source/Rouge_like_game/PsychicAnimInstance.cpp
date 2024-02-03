@@ -6,7 +6,8 @@
 #include "PsychicDevUtils.h"
 
 UPsychicAnimInstance::UPsychicAnimInstance() :
-	bIsGrabbing(false)
+	bIsGrabbing(false),
+	bCanFiring(false)
 {
 }
 
@@ -18,6 +19,7 @@ void UPsychicAnimInstance::UpdateAnimationProperties(float DeltaTime)
 	if (PsychicCharacter)
 	{
 		bIsGrabbing = IsGrabbingItem();
+		bCanFiring = PsychicCharacter->GetTeleState() == ETeleState::ETS_CanFire;
 	}
 }
 
@@ -31,7 +33,6 @@ bool UPsychicAnimInstance::IsGrabbingItem()
 	if (PsychicCharacter == nullptr)
 		return false;
 
-	return  PsychicCharacter->GetTeleState() == ETeleState::ETS_Scanning || 
-			PsychicCharacter->GetTeleState() == ETeleState::ETS_Holding ||
-			PsychicCharacter->GetTeleState() == ETeleState::ETS_CanFire;
+	return  PsychicCharacter->GetTeleState() == ETeleState::ETS_Scanning ||
+			PsychicCharacter->GetTeleState() == ETeleState::ETS_Holding;
 }

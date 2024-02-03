@@ -69,6 +69,9 @@ private:
 	UPROPERTY(VisibleDefaultsOnly, Category = "Psychic - Combat")
 	USkeletalMeshComponent* FPHandsMesh;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	USceneComponent* FPHandsRoot;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
 	ETeleState TeleState;
 
@@ -89,5 +92,6 @@ private:
 
 public:
 	FORCEINLINE UCameraComponent* GetCameraComponent() const { return CameraComponent; }
+	FORCEINLINE USceneComponent* GetHandsRoot() const { return FPHandsRoot; }
 	FORCEINLINE ETeleState GetTeleState() const { return TeleState; }
 };
