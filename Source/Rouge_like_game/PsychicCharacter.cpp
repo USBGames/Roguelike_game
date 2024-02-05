@@ -12,6 +12,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 
 // Sets default values
 APsychicCharacter::APsychicCharacter() :
@@ -27,22 +28,28 @@ APsychicCharacter::APsychicCharacter() :
 	//Set size for Capsule Component
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
 
-	//Camera Component
-	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FPCam"));
-	CameraComponent->SetupAttachment(GetCapsuleComponent());
-	CameraComponent->SetRelativeLocation(FVector(-39.56f, 1.75f, 64.f)); // Position the camera
-	CameraComponent->bUsePawnControlRotation = true;
-
 	FPHandsRoot = CreateDefaultSubobject<USceneComponent>(TEXT("FPHandsRoot"));
-	FPHandsRoot->SetupAttachment(CameraComponent);
+	FPHandsRoot->SetupAttachment(GetCapsuleComponent());
+
+	FPOffsetRoot = CreateDefaultSubobject<USpringArmComponent>(TEXT("FPOffsetRoot"));
+	FPOffsetRoot->SetupAttachment(FPHandsRoot);
 
 	// Create a mesh component that will be used when being viewed from a '1st person' view (when controlling this pawn)
 	FPHandsMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FPHandsMesh"));
 	FPHandsMesh->SetOnlyOwnerSee(true);
-	FPHandsMesh->SetupAttachment(FPHandsRoot);
+	FPHandsMesh->SetupAttachment(FPOffsetRoot);
 	FPHandsMesh->bCastDynamicShadow = false;
 	FPHandsMesh->CastShadow = false;
 	FPHandsMesh->SetRelativeLocation(FVector(-5.f, 0.f, -170.f));
+
+	FPCamRoot = CreateDefaultSubobject<USpringArmComponent>(TEXT("FPCamRoot"));
+	FPCamRoot->SetupAttachment(FPHandsRoot);
+
+	//Camera Component
+	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FPCam"));
+	CameraComponent->SetupAttachment(FPCamRoot);
+	CameraComponent->SetRelativeLocation(FVector(-39.56f, 1.75f, 64.f)); // Position the camera
+	CameraComponent->bUsePawnControlRotation = true;
 }
 
 // Called when the game starts or when spawned

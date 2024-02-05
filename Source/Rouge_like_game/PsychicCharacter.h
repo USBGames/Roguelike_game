@@ -9,6 +9,7 @@
 
 class UCameraComponent;
 class USkeletalMeshComponent;
+class USpringArmComponent;
 class UInputMappingContext;
 class UPsychicInputConfigData;
 class APsychicItem;
@@ -63,14 +64,20 @@ protected:
 	void ReleaseShootItem();
 
 private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Psychic - Camera", meta = (AllowPrivateAccess = "true"))
-	UCameraComponent* CameraComponent;
-
-	UPROPERTY(VisibleDefaultsOnly, Category = "Psychic - Combat")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Psychic - Camera", meta = (AllowPrivateAccess = "true"))
 	USkeletalMeshComponent* FPHandsMesh;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Psychic - Camera", meta = (AllowPrivateAccess = "true"))
 	USceneComponent* FPHandsRoot;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Psychic - Camera", meta = (AllowPrivateAccess = "true"))
+	USpringArmComponent* FPOffsetRoot;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Psychic - Camera", meta = (AllowPrivateAccess = "true"))
+	USpringArmComponent* FPCamRoot;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Psychic - Camera", meta = (AllowPrivateAccess = "true"))
+	UCameraComponent* CameraComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
 	ETeleState TeleState;
