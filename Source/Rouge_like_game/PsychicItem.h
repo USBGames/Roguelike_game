@@ -37,10 +37,10 @@ protected:
 	void SetItemProperties();
 
 private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Psychic - Properties", meta = (AllowPrivateAccess = "true"))
 	UStaticMeshComponent* ItemMesh;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Psychic - Properties", meta = (AllowPrivateAccess = "true"))
 	EItemState ItemState;
 
 public:
