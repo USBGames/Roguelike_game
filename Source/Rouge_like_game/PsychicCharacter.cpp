@@ -107,7 +107,7 @@ APsychicCharacter::APsychicCharacter() :
 void APsychicCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	//Setup Input Mapping Context
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{

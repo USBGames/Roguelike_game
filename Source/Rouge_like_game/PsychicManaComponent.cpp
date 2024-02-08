@@ -30,8 +30,6 @@ void UPsychicManaComponent::BeginPlay()
 	ManaCurrent = ManaBase;	
 }
 
-
-// Called every frame
 void UPsychicManaComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -45,7 +43,7 @@ void UPsychicManaComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 			ManaRechargeTimeCurrent = 0.0f;
 		}
 	}
-	else
+	else if(!(PsychicCharacter->GetTeleState() == ETeleState::ETS_Holding) && !(PsychicCharacter->GetTeleState() == ETeleState::ETS_CanFire))
 	{
 		ManaCurrent += DeltaTime * ManaRechargeRate;
 		ManaCurrent = FMath::Clamp(ManaCurrent, 0.0f, ManaBase);
@@ -60,7 +58,7 @@ void UPsychicManaComponent::SetPsychicCharacter(APsychicCharacter* Character)
 
 void UPsychicManaComponent::OnItemShoot(APsychicCharacter* Character)
 {
-	DebugLog(-1, 1.0f, FColor::Cyan, "Item SHOOT!");
+	//DebugLog(-1, 1.0f, FColor::Cyan, "Item SHOOT!");
 
 	if (PsychicCharacter == nullptr)
 		PsychicCharacter = Character;
