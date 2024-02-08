@@ -12,6 +12,8 @@ class USkeletalMeshComponent;
 class USpringArmComponent;
 class UInputMappingContext;
 class UPsychicInputConfigData;
+class UPhysicsConstraintComponent;
+class UPsychicManaComponent;
 class APsychicItem;
 
 UENUM(BlueprintType)
@@ -23,6 +25,8 @@ enum class ETeleState : uint8
 	ETS_CanFire UMETA(DisplayName = "Can Fire"),
 	ETS_MAX UMETA(DisplayName = "DefaultMAX")
 };
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemShootSignature, APsychicCharacter*, PsychicCharacter);
 
 UCLASS()
 class ROUGE_LIKE_GAME_API APsychicCharacter : public ACharacter
@@ -51,6 +55,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Psychic - Input")
 	UPsychicInputConfigData* InputActions;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Psychic - Components", meta = (AllowPrivateAccess = "true"))
+	class UPsychicManaComponent* ManaComponent;
+
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 	void PrimaryPressed(const FInputActionValue& Value);
@@ -61,7 +68,14 @@ protected:
 
 	void ScanForItems();
 	void GrabItem();
-	void ReleaseShootItem();
+	void ReleaseShootItem(bool bShoot = false);
+
+	void ItemGrabInterpStart();
+	void ItemGrabInterpFinish();
+
+public:
+	UPROPERTY(BlueprintAssignable, Category = "Psychic - Events")
+	FOnItemShootSignature OnItemShoot;
 
 private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Psychic - Camera", meta = (AllowPrivateAccess = "true"))
@@ -74,10 +88,18 @@ private:
 	USpringArmComponent* FPOffsetRoot;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Psychic - Camera", meta = (AllowPrivateAccess = "true"))
-	USpringArmComponent* FPCamRoot;
+	USpringArmComponent* FPCamRoot;	
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Psychic - Camera", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* CameraComponent;
+
+	//===========================================
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
+	UStaticMeshComponent* FPGrabHeldSlot;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
+	UPhysicsConstraintComponent* FPGrabConstraint;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
 	ETeleState TeleState;
@@ -94,10 +116,23 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
 	float ItemMinGrabDistance;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
+	float ItemInterpTime;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
+	float ItemInterpSpeed;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Psychic - Combat", meta = (AllowPrivateAccess = "true"))
-	APsychicItem* CurrentItemGrabbed;	
+	APsychicItem* CurrentItemGrabbed;
+
+	//===========================================
+
+	bool bItemIsInterping;
+	FTimerHandle ItemGrabInterpTimerHandler;
 
 public:
+	FORCEINLINE UPsychicManaComponent* GetManaComponent() const { return ManaComponent; }
+
 	FORCEINLINE UCameraComponent* GetCameraComponent() const { return CameraComponent; }
 	FORCEINLINE USceneComponent* GetHandsRoot() const { return FPHandsRoot; }
 	FORCEINLINE ETeleState GetTeleState() const { return TeleState; }

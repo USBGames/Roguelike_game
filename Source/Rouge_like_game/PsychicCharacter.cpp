@@ -4,6 +4,7 @@
 #include "PsychicCharacter.h"
 #include "PsychicDevUtils.h"
 #include "PsychicItem.h"
+#include "PsychicManaComponent.h"
 #include "InputMappingContext.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
@@ -12,27 +13,42 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "PhysicsEngine/PhysicsConstraintComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 // Sets default values
 APsychicCharacter::APsychicCharacter() :
 	TeleState(ETeleState::ETS_Idle),
+	
 	MaxTeleScanDistance(1000.0f),
-	ItemGrabForceAmount(100.0f),
-	ItemReleaseForceAmount(1000.0f),
-	ItemMinGrabDistance(100.0f)
+	ItemGrabForceAmount(650000.0f),
+	ItemReleaseForceAmount(700000.0f),
+	ItemMinGrabDistance(100.0f),
+	
+	ItemInterpTime(1.0f),
+	ItemInterpSpeed(30.0f),
+	bItemIsInterping(false)
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	//Set size for Capsule Component
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
 
 	FPHandsRoot = CreateDefaultSubobject<USceneComponent>(TEXT("FPHandsRoot"));
 	FPHandsRoot->SetupAttachment(GetCapsuleComponent());
+	FPHandsRoot->SetRelativeLocation(FVector(0.0f, 0.0f, 70.0f));
 
 	FPOffsetRoot = CreateDefaultSubobject<USpringArmComponent>(TEXT("FPOffsetRoot"));
 	FPOffsetRoot->SetupAttachment(FPHandsRoot);
+	FPOffsetRoot->TargetArmLength = 0.0f;
+	FPOffsetRoot->bDoCollisionTest = false;
+	FPOffsetRoot->bUsePawnControlRotation = true;
+	FPOffsetRoot->bInheritPitch = true;
+	FPOffsetRoot->bInheritYaw = true;
+	FPOffsetRoot->bInheritRoll = false;
+	FPOffsetRoot->SetComponentTickEnabled(false);
 
 	// Create a mesh component that will be used when being viewed from a '1st person' view (when controlling this pawn)
 	FPHandsMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FPHandsMesh"));
@@ -40,16 +56,51 @@ APsychicCharacter::APsychicCharacter() :
 	FPHandsMesh->SetupAttachment(FPOffsetRoot);
 	FPHandsMesh->bCastDynamicShadow = false;
 	FPHandsMesh->CastShadow = false;
-	FPHandsMesh->SetRelativeLocation(FVector(-5.f, 0.f, -170.f));
+	FPHandsMesh->SetRelativeLocation(FVector(5.0f, 0.f, -180.0f));
+	FPHandsMesh->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
 
 	FPCamRoot = CreateDefaultSubobject<USpringArmComponent>(TEXT("FPCamRoot"));
 	FPCamRoot->SetupAttachment(FPHandsRoot);
+	FPCamRoot->TargetArmLength = 0.0f;
+	FPCamRoot->bDoCollisionTest = false;
+	FPCamRoot->bUsePawnControlRotation = true;
+	FPCamRoot->bInheritPitch = true;
+	FPCamRoot->bInheritYaw = true;
+	FPCamRoot->bInheritRoll = false;
+	FPCamRoot->SetComponentTickEnabled(false);
 
 	//Camera Component
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FPCam"));
 	CameraComponent->SetupAttachment(FPCamRoot);
-	CameraComponent->SetRelativeLocation(FVector(-39.56f, 1.75f, 64.f)); // Position the camera
+	CameraComponent->SetRelativeLocation(FVector::ZeroVector);
 	CameraComponent->bUsePawnControlRotation = true;
+
+	FPGrabHeldSlot = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FPGrabHeldSlot"));
+	FPGrabHeldSlot->SetupAttachment(CameraComponent);
+	FPGrabHeldSlot->SetRelativeScale3D(FVector(0.1f, 0.1f, 0.1f));
+	FPGrabHeldSlot->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	FPGrabHeldSlot->SetCollisionObjectType(ECollisionChannel::ECC_WorldStatic);
+	FPGrabHeldSlot->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+	FPGrabHeldSlot->SetHiddenInGame(true);
+
+	//Physics Handle
+	FPGrabConstraint = CreateDefaultSubobject<UPhysicsConstraintComponent>(TEXT("FPGrabHandle"));
+	FPGrabConstraint->SetupAttachment(FPGrabHeldSlot);
+	
+	FConstraintInstance& cInstance = FPGrabConstraint->ConstraintInstance;
+	cInstance.SetLinearXMotion(ELinearConstraintMotion::LCM_Free);
+	cInstance.SetLinearYMotion(ELinearConstraintMotion::LCM_Free);
+	cInstance.SetLinearZMotion(ELinearConstraintMotion::LCM_Free);
+	cInstance.SetAngularTwistMotion(EAngularConstraintMotion::ACM_Free);
+	cInstance.SetLinearPositionDrive(true, true, true);
+	cInstance.SetLinearVelocityDrive(true, true, true);
+	cInstance.SetAngularDriveMode(EAngularDriveMode::TwistAndSwing);
+	cInstance.SetOrientationDriveTwistAndSwing(true, true);
+	cInstance.SetAngularVelocityDriveTwistAndSwing(true, true);
+
+	ManaComponent = CreateDefaultSubobject<UPsychicManaComponent>(TEXT("PsychicManaComponent"));
+
+	GetCharacterMovement()->AirControl = 0.5f;
 }
 
 // Called when the game starts or when spawned
@@ -66,12 +117,31 @@ void APsychicCharacter::BeginPlay()
 			Subsystem->AddMappingContext(InputMapping, 0);
 		}
 	}
+
+	if(FPGrabHeldSlot) FPGrabHeldSlot->SetWorldLocation(GetGrabLocation());
+	if(ManaComponent) ManaComponent->SetPsychicCharacter(this);
 }
 
 // Called every frame
 void APsychicCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	if (bItemIsInterping && CurrentItemGrabbed != nullptr)
+	{
+		const FVector CurrentLocation = CurrentItemGrabbed->GetActorLocation();
+		const FVector EndLocation = GetGrabLocation();
+
+		FVector InterpedLocation = FMath::VInterpTo(CurrentLocation, EndLocation, DeltaTime, ItemInterpSpeed);
+
+		CurrentItemGrabbed->SetActorLocation(InterpedLocation);
+	}
+
+	/*FPGrabConstraint->ConstraintInstance.SetLinearPositionTarget(GetGrabLocation());
+	if (CurrentItemGrabbed != nullptr && TeleState == ETeleState::ETS_CanFire)
+	{
+		FPGrabHeldSlot->SetWorldLocation(CurrentItemGrabbed->GetActorLocation(), false, nullptr, ETeleportType::TeleportPhysics);
+	}*/
 
 	/*if (bMouseHolding)
 	{
@@ -108,7 +178,6 @@ void APsychicCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 void APsychicCharacter::Move(const FInputActionValue& Value)
 {
-	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
 
 	if (Controller != nullptr)
@@ -157,7 +226,7 @@ void APsychicCharacter::PrimaryRelease(const FInputActionValue& Value)
 	{
 		if (CurrentItemGrabbed->GetItemState() == EItemState::EIT_Grabbed && TeleState == ETeleState::ETS_CanFire)
 		{
-			ReleaseShootItem();
+			ReleaseShootItem(ManaComponent->HasEnoughMana());
 			TeleState = ETeleState::ETS_Idle;
 		}
 		else if (CurrentItemGrabbed->GetItemState() == EItemState::EIT_Grabbing && TeleState == ETeleState::ETS_Holding)
@@ -179,14 +248,15 @@ FVector APsychicCharacter::GetGrabLocation()
 void APsychicCharacter::ScanForItems()
 {
 	const FVector TraceStart = CameraComponent->GetComponentLocation();
-	const FVector TraceEnd = CameraComponent->GetComponentLocation() + CameraComponent->GetForwardVector() * MaxTeleScanDistance;
+	const FVector TraceEnd = CameraComponent->GetComponentLocation() + (CameraComponent->GetForwardVector() * MaxTeleScanDistance);
 
 	FHitResult HitResult;
 	bool HitSuccess = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility);
 	//DrawDebugLine(GetWorld(), TraceStart, TraceEnd, HitSuccess ? FColor::Blue : FColor::Red, false, 5.0f, 0, 10.0f);
 	if (HitSuccess)
-	{
-		CurrentItemGrabbed = Cast<APsychicItem>(HitResult.GetActor());
+	{		
+		CurrentItemGrabbed = Cast<APsychicItem>(HitResult.GetActor());		
+		
 		if (CurrentItemGrabbed && CurrentItemGrabbed->GetItemState() == EItemState::EIT_Idle)
 		{
 			TeleState = ETeleState::ETS_Holding;
@@ -200,22 +270,59 @@ void APsychicCharacter::GrabItem()
 	FVector GrabDir = GetGrabLocation() - CurrentItemGrabbed->GetActorLocation();
 	GrabDir.Normalize();
 
-	CurrentItemGrabbed->GetItemMesh()->AddForce(GrabDir * ItemGrabForceAmount);
+	if (CurrentItemGrabbed->GetItemState() == EItemState::EIT_Grabbing)
+	{
+		CurrentItemGrabbed->GetItemMesh()->AddTorqueInDegrees(FVector(-360.0f, 360.0f, 0.0f) * ItemGrabForceAmount);
+		CurrentItemGrabbed->GetItemMesh()->AddForce(GrabDir * ItemGrabForceAmount);	
+	}
 
 	if (CurrentItemGrabbed->GetItemState() == EItemState::EIT_Grabbing)
 	{
-		float distance = FVector::Distance(GetGrabLocation(), CurrentItemGrabbed->GetActorLocation());
+		float distance = FVector::Distance(GetGrabLocation(), CurrentItemGrabbed->GetActorLocation());		
 		if (distance <= ItemMinGrabDistance)
-		{
+		{						
+			//CurrentItemGrabbed->GetItemMesh()->WakeRigidBody();			
+			//FPGrabConstraint->SetConstrainedComponents(FPGrabHeldSlot, NAME_None, CurrentItemGrabbed->GetItemMesh(), NAME_None);
+			ItemGrabInterpStart();
+
 			TeleState = ETeleState::ETS_CanFire;
 			CurrentItemGrabbed->SetItemState(EItemState::EIT_Grabbed);
 		}
 	}
 }
 
-void APsychicCharacter::ReleaseShootItem()
+void APsychicCharacter::ReleaseShootItem(bool bShoot)
 {
+	bItemIsInterping = false;
+	if(GetWorldTimerManager().IsTimerActive(ItemGrabInterpTimerHandler))
+		GetWorldTimerManager().ClearTimer(ItemGrabInterpTimerHandler);
+
+	FPGrabConstraint->BreakConstraint();
+
 	CurrentItemGrabbed->SetItemState(EItemState::EIT_Idle);
-	CurrentItemGrabbed->GetItemMesh()->AddImpulse(CameraComponent->GetForwardVector() * ItemReleaseForceAmount);
+	if (bShoot)
+	{
+		CurrentItemGrabbed->GetItemMesh()->AddImpulse(CameraComponent->GetForwardVector() * ItemReleaseForceAmount);
+		OnItemShoot.Broadcast(this);
+	}
 	CurrentItemGrabbed = nullptr;
+}
+
+void APsychicCharacter::ItemGrabInterpStart()
+{
+	bItemIsInterping = true;
+	
+	GetWorldTimerManager().ClearTimer(ItemGrabInterpTimerHandler);
+	GetWorldTimerManager().SetTimer(ItemGrabInterpTimerHandler, this, &APsychicCharacter::ItemGrabInterpFinish, ItemInterpTime);
+}
+
+void APsychicCharacter::ItemGrabInterpFinish()
+{
+	bItemIsInterping = false;
+
+	if(CurrentItemGrabbed)
+	{
+		CurrentItemGrabbed->GetItemMesh()->WakeRigidBody();
+		FPGrabConstraint->SetConstrainedComponents(FPGrabHeldSlot, NAME_None, CurrentItemGrabbed->GetItemMesh(), NAME_None);
+	}
 }
